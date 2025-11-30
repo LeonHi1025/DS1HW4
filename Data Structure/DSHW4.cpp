@@ -10,34 +10,73 @@ class Data {
  private:
   // std::string file_name;
   std::string oid, arr, dura, time;
-  std::vector<unsigned long long> order_number;
-  std::vector<unsigned long long> minute; //  「下單時刻」（第幾分鐘）
-  std::vector<unsigned long long> duration; //「製作耗時」（多少分鐘）
-  std::vector<unsigned long long> delay; //   「逾時時刻」（第幾分鐘）
-  unsigned long long reading_data_time;
-  unsigned long long sorting_data_time;
-  unsigned long long writing_data_time;
+  std::vector<int> order_number;
+  std::vector<int> minute;   //「下單時刻」（第幾分鐘）
+  std::vector<int> duration; //「製作耗時」（多少分鐘）
+  std::vector<int> delay;    //「逾時時刻」（第幾分鐘），允許最晚完成時間
+  int reading_data_time;
+  int sorting_data_time;
+  int writing_data_time;
 
  public:
   bool LoadFile(std::string file_name);
+  bool LoadSortedFile(std::string file_name);
   void OutputSortedFile(std::string file_name);
-  void SaveFile(unsigned long long t_ord, unsigned long long t_min, unsigned long long t_du, unsigned long long t_de);
-  void ClearFile(std::vector<unsigned long long>);
+  void SaveFile(int t_ord, int t_min, int t_du, int t_de);
+  void ClearFile(std::vector<int>);
   void PrintFile();
   void Shell_Sort();
+  void PopHead();
   // void SetFileName(std::string name);
-  void InsertData(std::vector<unsigned long long> &swap, int smaller, int front, int back);
+  void InsertData(std::vector<int> &swap, int smaller, int front, int back);
   void Show_data_time();
+  void SingleCooker();
+  void DealWithOrder(Data &abort, Data &timeout, int &current_time);
 };
 
-class Queue {
- private:
-  
- public:
 
-};
+void Data::PopHead() {
+  this->order_number.erase(order_number.begin());
+  this->minute.erase(minute.begin());
+  this->duration.erase(duration.begin());
+  this->delay.erase(delay.begin());
+}
 
 // 載入數據
+bool Data::LoadSortedFile(std::string file_name) { 
+  auto start = std::chrono::high_resolution_clock::now();
+  std::ifstream in;
+  std::string intput_file_name = "sorted" + file_name + ".txt";
+
+  // 嘗試開啟檔案，若找不到檔案名，輸出錯誤訊息
+  in.open(intput_file_name);
+  if(in.fail()) {
+    return false;
+  }
+
+  ClearFile(order_number);
+  ClearFile(minute);
+  ClearFile(duration);
+  ClearFile(delay);
+
+  in >> oid >> arr >> dura >> time;
+  unsigned long long t_ord, t_min, t_du, t_de;
+
+  // https://hackmd.io/@ndhu-programming-2021/BkZukG4jK#隱藏的-flag
+  while(!in.eof()) {
+    in >> t_ord >> t_min >> t_du >> t_de;
+    if (!in.fail()){
+      SaveFile(t_ord, t_min, t_du, t_de);
+    }
+  }
+  // 關閉讀取
+  in.close();
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+  this->reading_data_time = duration.count();
+  return true;
+}
+
 bool Data::LoadFile(std::string file_name) { 
   auto start = std::chrono::high_resolution_clock::now();
   std::ifstream in;
@@ -70,7 +109,9 @@ bool Data::LoadFile(std::string file_name) {
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
   this->reading_data_time = duration.count();
   return true;
-  }
+}
+
+
 
 // 輸出整理過的數據
 void Data::OutputSortedFile(std::string file_name) {
@@ -95,7 +136,7 @@ void Data::OutputSortedFile(std::string file_name) {
 }
 
 // 存進vector
-void Data::SaveFile(unsigned long long t_ord, unsigned long long t_min, unsigned long long t_du, unsigned long long t_de) {
+void Data::SaveFile(int t_ord, int t_min, int t_du, int t_de) {
   this->order_number.push_back(t_ord);
   this->minute.push_back(t_min);
   this->duration.push_back(t_du);
@@ -103,7 +144,7 @@ void Data::SaveFile(unsigned long long t_ord, unsigned long long t_min, unsigned
 }
 
 // 檔案清空哦
-void Data::ClearFile(std::vector<unsigned long long> trash) {
+void Data::ClearFile(std::vector<int> trash) {
   trash.clear();
 }
 
@@ -123,7 +164,7 @@ void Data::PrintFile() {
   std::cout << std::endl;
 }
 
-// 普希爾排序法
+// 希爾排序法
 void Data::Shell_Sort() {
   auto start = std::chrono::high_resolution_clock::now();
   int size = this->order_number.size();
@@ -160,7 +201,7 @@ void Data::Shell_Sort() {
   this->file_name = name;
 }*/
 
-void Data::InsertData(std::vector<unsigned long long> &swap, int smaller, int front, int back) {
+void Data::InsertData(std::vector<int> &swap, int smaller, int front, int back) {
   int bigger = swap.at(front);
   swap.erase(swap.begin() + front);
   swap.insert(swap.begin() + front, smaller);
@@ -177,14 +218,117 @@ void Data::Show_data_time() {
   std::cout << std::endl;
 }
 
+void Data::SingleCooker() {
+  int current_time = minute[0] + duration[0];
+  int total_delay = 0;
+  Data do_order; // 不應同時超過三筆
+  Data abort;    
+  Data timeout;
+  PopHead();     // 第一筆已消失
+  while(!order_number.empty()) {
+    /*std::cout << order_number[0] << std::endl;
+    std::cout << current_time << std::endl;*/
+    if (minute[0] + duration[0] > delay[0] || duration[0] <= 0) {
+      PopHead();
+    }
+
+    /*if (order_number[0] == 101) {
+      std::cout << "cur " << current_time << std::endl;
+      std::cout << "===order===" << std::endl;
+      do_order.PrintFile();
+      std::cout << "===abort===" << std::endl;
+      abort.PrintFile();
+      PrintFile();
+      return;
+    }*/
+
+    if (this->minute[0] == current_time) {
+      do_order.DealWithOrder(abort, timeout, current_time);
+      do_order.SaveFile(order_number[0], minute[0], duration[0], delay[0]);
+      PopHead();
+      // std::cout << current_time << std::endl;
+      continue;;
+    }
+
+    else if(this->minute[0] < current_time) {
+      // 如果處理訂單未滿三筆，請讀入
+      if (do_order.order_number.size() < 3) { 
+        do_order.SaveFile(order_number[0], minute[0], duration[0], delay[0]);
+        PopHead();
+        continue;
+      }
+
+      // 如果滿三筆後續請棄單
+      else { 
+        abort.SaveFile(order_number[0], minute[0], duration[0], delay[0]);
+        PopHead();
+        continue;
+      }
+    }
+    // 阿就真的沒有了，直接更新辣
+    else if (this->minute[0] > current_time) {
+      while (!do_order.order_number.empty()) {
+      // 開始處理訂單內容，如果current_time一發生變化就會返回讀資料
+        do_order.DealWithOrder(abort, timeout, current_time);
+      }
+      if (this->minute[0] > current_time) {
+        current_time = minute[0] + duration[0];
+      }
+      PopHead();
+      continue;
+    }
+
+    // 開始處理訂單內容，如果current_time一發生變化就會返回讀資料
+    do_order.DealWithOrder(abort, timeout, current_time);
+  }
+
+  while (!do_order.order_number.empty()) {
+    // 開始處理訂單內容，如果current_time一發生變化就會返回讀資料
+    do_order.DealWithOrder(abort, timeout, current_time);
+  }
+  
+  // std::cout << current_time << "hi\n";
+  std::cout << "===abort===\n";
+  abort.PrintFile();
+  std::cout << "\n===time_out===\n";
+  timeout.PrintFile();
+}
+
+// 處理三筆order資料
+void Data::DealWithOrder(Data &abort, Data &timeout, int &current_time) {
+  while(!order_number.empty()) {
+    // 成功處理
+    if(delay[0] >= current_time)  {
+      // 逾時單
+
+      if (current_time + duration[0] > delay[0]) {
+        timeout.SaveFile(order_number[0],
+                         minute[0],
+                         duration[0],
+                         delay[0]);
+      }
+      // 更新current_time
+      current_time = current_time + duration[0];
+      PopHead();
+      return;
+    }
+
+    // 棄單
+    else {
+      abort.SaveFile(order_number[0],
+                     minute[0],
+                     duration[0],
+                     delay[0]);
+      PopHead();
+    }
+  }
+}
+
 
 int main() {
   Data data;
-  std::cout << "testing 401...." << std::endl;
-  data.LoadFile("401");
-  data.PrintFile();
-  data.Shell_Sort();
-  data.OutputSortedFile("401");
-  data.Show_data_time();
+  std::cout << "testing 404...." << std::endl;
+  data.LoadSortedFile("404");
+  data.SingleCooker();
   return 0;
 }
