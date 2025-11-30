@@ -2,18 +2,22 @@
 
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 #include <string>
 #include <limits>
 #include <chrono>
 
 class Data { 
  private:
-  // std::string file_name;
+  std::string file_name;
   std::string oid, arr, dura, time;
   std::vector<int> order_number;
   std::vector<int> minute;   //「下單時刻」（第幾分鐘）
   std::vector<int> duration; //「製作耗時」（多少分鐘）
   std::vector<int> delay;    //「逾時時刻」（第幾分鐘），允許最晚完成時間
+  std::vector<int> cid;
+  std::vector<int> delay_order;
+  std::vector<int> leave;
   int reading_data_time;
   int sorting_data_time;
   int writing_data_time;
@@ -23,17 +27,21 @@ class Data {
   bool LoadSortedFile(std::string file_name);
   void OutputSortedFile(std::string file_name);
   void SaveFile(int t_ord, int t_min, int t_du, int t_de);
+  void SaveCookList(int current_time);
   void ClearFile(std::vector<int>);
   void PrintFile();
   void Shell_Sort();
   void PopHead();
-  // void SetFileName(std::string name);
+  void SetFileName(std::string name);
   void InsertData(std::vector<int> &swap, int smaller, int front, int back);
   void Show_data_time();
   void SingleCooker();
+  void OutputSingleCookerList(Data abort, Data timeout, float total);
   void DealWithOrder(Data &abort, Data &timeout, int &current_time);
 };
-
+void Data::SetFileName(std::string name) {
+  file_name = name;
+}
 
 void Data::PopHead() {
   this->order_number.erase(order_number.begin());
@@ -219,6 +227,7 @@ void Data::Show_data_time() {
 }
 
 void Data::SingleCooker() {
+  float total_size = this->order_number.size();
   int current_time = minute[0] + duration[0];
   int total_delay = 0;
   Data do_order; // 不應同時超過三筆
@@ -232,7 +241,7 @@ void Data::SingleCooker() {
       PopHead();
     }
 
-    /*if (order_number[0] == 101) {
+    /*if (order_number[0] == 102) {
       std::cout << "cur " << current_time << std::endl;
       std::cout << "===order===" << std::endl;
       do_order.PrintFile();
@@ -261,6 +270,9 @@ void Data::SingleCooker() {
       // 如果滿三筆後續請棄單
       else { 
         abort.SaveFile(order_number[0], minute[0], duration[0], delay[0]);
+        abort.cid.push_back(0);
+        abort.delay_order.push_back(0);
+        abort.leave.push_back(this->minute[0]);
         PopHead();
         continue;
       }
@@ -274,6 +286,11 @@ void Data::SingleCooker() {
       if (this->minute[0] > current_time) {
         current_time = minute[0] + duration[0];
       }
+
+      else {
+        do_order.SaveFile(order_number[0], minute[0], duration[0], delay[0]);
+      }
+
       PopHead();
       continue;
     }
@@ -286,12 +303,7 @@ void Data::SingleCooker() {
     // 開始處理訂單內容，如果current_time一發生變化就會返回讀資料
     do_order.DealWithOrder(abort, timeout, current_time);
   }
-  
-  // std::cout << current_time << "hi\n";
-  std::cout << "===abort===\n";
-  abort.PrintFile();
-  std::cout << "\n===time_out===\n";
-  timeout.PrintFile();
+  OutputSingleCookerList(abort, timeout, total_size);
 }
 
 // 處理三筆order資料
@@ -306,6 +318,9 @@ void Data::DealWithOrder(Data &abort, Data &timeout, int &current_time) {
                          minute[0],
                          duration[0],
                          delay[0]);
+        timeout.cid.push_back(1);
+        timeout.delay_order.push_back(current_time - this->minute[0]);
+        timeout.leave.push_back(current_time + duration[0]);
       }
       // 更新current_time
       current_time = current_time + duration[0];
@@ -319,16 +334,65 @@ void Data::DealWithOrder(Data &abort, Data &timeout, int &current_time) {
                      minute[0],
                      duration[0],
                      delay[0]);
+      abort.cid.push_back(1);
+      abort.delay_order.push_back(current_time - minute[0]);
+      abort.leave.push_back(current_time);
       PopHead();
     }
   }
 }
 
+void Data::OutputSingleCookerList(Data abort, Data timeout, float total) {
+  int delay_count = 0;
+  int abort_count = 0;
+  int total_delay = 0;
+  float fail_data = 0;
+  
+  std::ofstream outputFile("one" + file_name + ".txt", std::ios::out);
+  outputFile << "\t[Abort List]" << std::endl;
+  outputFile << "\tOID";
+  outputFile << "\tCID" ;
+  outputFile << "\tDelay ";
+  outputFile << "Abort" << std::endl;
+  // 輸出abort list
+  for (int i = 0; i < abort.order_number.size(); i++) {
+    outputFile << "[" << i + 1 << "]";         // OID
+    outputFile << '\t' << abort.order_number[i];
+    outputFile << '\t' <<abort.cid[i];          // CID
+    outputFile << '\t' <<abort.delay_order[i];        // Delay
+    outputFile << '\t' <<abort.leave[i] << std::endl;  // Abort
+    total_delay = total_delay + abort.delay_order[i];
+    fail_data++;
+  }
+
+  outputFile << "\t[Timeout List]" << std::endl;
+  outputFile << "\tOID ";
+  outputFile << "\tCID " ;
+  outputFile << "\tDelay ";
+  outputFile << "\tDeparture" << std::endl;
+  for (int i = 0; i < timeout.order_number.size(); i++) {
+    outputFile << "[" << i + 1 << "]\t";
+    outputFile << timeout.order_number[i]; 
+    outputFile << '\t' <<timeout.cid[i]; 
+    outputFile << '\t' <<timeout.delay_order[i];
+    outputFile << '\t' <<timeout.leave[i] << std::endl;
+    total_delay = total_delay + timeout.delay_order[i];
+    fail_data++;
+  }
+  outputFile << "[Total Delay]" << std::endl;
+  outputFile << total_delay << " min." << std::endl;
+  outputFile << "[Failure Percentage]" << std::endl;
+  float failure_rate = (fail_data / total) * 100;
+  outputFile << std::fixed << std::setprecision(2) << failure_rate << " %";
+  outputFile.close();
+}
 
 int main() {
   Data data;
-  std::cout << "testing 404...." << std::endl;
-  data.LoadSortedFile("404");
+  std::cout << "testing 402...." << std::endl;
+  data.SetFileName("401");
+  data.LoadSortedFile("401");
   data.SingleCooker();
+  std::cout << "finish!";
   return 0;
 }
