@@ -402,6 +402,9 @@ void Data::AnyCook() {
 
     // 看是否有閒置
     for (int i = 0 ; i < number_of_cook ; i++) {
+      while (minute[0] + duration[0] > delay[0] || duration[0] <= 0) {
+        PopHead();
+      }
       if (multi_cook[i].idle_time <= minute[0] && multi_cook[i].GetFileLength() == 0) {
         if (order_number.empty()) {
           end = true;
@@ -418,6 +421,9 @@ void Data::AnyCook() {
 
     need_to_queue = true;
     for (int i = 0 ; i < number_of_cook ; i++) {
+      while (minute[0] + duration[0] > delay[0] || duration[0] <= 0) {
+        PopHead();
+      }
       if (order_number.empty()) {
         need_to_queue = false;
         break;
@@ -459,6 +465,9 @@ void Data::AnyCook() {
 
       // 檢查是否需要queue
       for (int i = 0 ; i < number_of_cook ; i++) {
+        while (minute[0] + duration[0] > delay[0] || duration[0] <= 0) {
+          PopHead();
+        }
         if (order_number.empty()) {
           need_to_queue = false;
           break;
@@ -538,12 +547,12 @@ int Data::GetFileLength() {
 
 int main() {
   Data data;
-  std::cout << "testing 402...." << std::endl;
-  data.SetFileName("402");
-  // data.LoadFile("402");
+  std::cout << "testing 403...." << std::endl;
+  // data.SetFileName("403");
+  // data.LoadFile("403");
   // data.Shell_Sort();
-  // data.OutputSortedFile("402");
-  data.LoadSortedFile("402");
+  // data.OutputSortedFile("403");
+  data.LoadSortedFile("403");
   data.AnyCook();
   std::cout << "finish!";
   return 0;
