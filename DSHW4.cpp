@@ -37,7 +37,7 @@ class Data {
   void InsertData(std::vector<int> &swap, int smaller, int front, int back);
   void Show_data_time();
   void SingleCooker();
-  void DoubleCooker();
+  void DoubleCooker(int people);
   void OutputCookerList(Data abort, Data timeout, float total, int cmd);
   void DealWithOrder(Data &abort, Data &timeout, int &current_time, int cook);
 };
@@ -278,12 +278,16 @@ void Data::SingleCooker() {
     }
     // 阿就真的沒有了，直接更新辣
     else if (this->minute[0] > current_time) {
-      while (!do_order.order_number.empty()) {
-      // 開始處理訂單內容，如果current_time一發生變化就會返回讀資料
-        do_order.DealWithOrder(abort, timeout, current_time, 1);
+      while(do_order.current_time <= minute[0]) {
+        do_order.DealWithOrder(abort, timeout, do_order.current_time, 1);
+        if (do_order.order_number.empty()) {
+          break;
+        }
       }
-      if (this->minute[0] > current_time) {
-        current_time = minute[0] + duration[0];
+        
+      if (do_order.order_number.empty() &&
+        do_order.current_time <= minute[0]) {
+        do_order.current_time = minute[0] + duration[0];
       }
 
       else {
@@ -305,25 +309,34 @@ void Data::SingleCooker() {
   OutputCookerList(abort, timeout, total_size, 2);
 }
 
-void Data::DoubleCooker() {
+void Data::DoubleCooker(int people) {
   float total_size = this->order_number.size();
   int total_delay = 0;
-  std::vector<Data> do_order; // 不應同時超過三筆
-  // 感覺可以迴圈但我懶
+  std::vector<Data> do_order;
   Data in; 
-  do_order.push_back(in);
-  do_order.push_back(in);
+  /*do_order.push_back(in);
+  do_order.push_back(in);*/
+
+  // 迴圈建立指定數量廚師
+  do_order.resize(people);
   Data abort;    
   Data timeout;
   int cooker = 0;
-  //初始化
-  do_order[0].current_time = minute[0] + duration[0];
+
+  // 迴圈初始化
+  for(int i = 0; i < people; i++) {
+    do_order[i].current_time = minute[0] + duration[0];
+    PopHead();
+  }
+
+  /*do_order[0].current_time = minute[0] + duration[0];
   PopHead();
   do_order[1].current_time = minute[0] + duration[0];
-  PopHead();
+  PopHead();*/
+
   while(!order_number.empty()) {
     //std::cout << order_number[0] << std::endl;
-      /*if (order_number[0] == 102) {
+      /*if (order_number[0] == 135) {
       std::cout << "cur " << do_order[0].current_time << std::endl;
       std::cout << "===order1===";
       do_order[0].PrintFile();
@@ -342,7 +355,32 @@ void Data::DoubleCooker() {
       PopHead();
     }
 
-    if (this->minute[0] == do_order[0].current_time ||
+    // 閒置和抵達一樣時間處理
+    bool special = false;
+    int special_cook = 0;
+    for(int i = 0; i < people; i++) {
+      if (this->minute[0] == do_order[i].current_time) {
+        special = true;
+        special_cook = i;
+        break;
+      }
+    }
+
+    int t_people = people;
+    if (special) {
+      for(int i = special_cook; i < t_people; i++) {
+        if (this->minute[0] == do_order[i].current_time) {
+          do_order[i].DealWithOrder(abort, timeout, do_order[i].current_time, i + 1);
+        }
+
+        if (special_cook + 1 == people) {
+          special = 0;
+          t_people = special;
+        }
+      }
+    }
+
+    /*if (this->minute[0] == do_order[0].current_time ||
         this->minute[0] == do_order[1].current_time) {
       if (this->minute[0] == do_order[0].current_time) {
         do_order[0].DealWithOrder(abort, timeout, do_order[0].current_time, 1);
@@ -357,39 +395,86 @@ void Data::DoubleCooker() {
           do_order[0].DealWithOrder(abort, timeout, do_order[1].current_time, 2);
         }
       }
-    }
+    }*/
 
     // 兩個都空閒
-    if (do_order[0].current_time <= minute[0] &&
+
+    bool findcook = false;
+    int usable_cook = 0;
+    int first_usable = 0;
+    /*if (do_order[0].current_time <= minute[0] &&
         do_order[1].current_time <= minute[0]) {
       cooker = 0;
+    }*/
+    // 一個是空閒且空空的
+    for(int i = 0; i < people && !findcook; i++) {
+      if (do_order[i].current_time <= minute[0] && 
+        do_order[i].order_number.size() == 0) {
+        cooker = i;
+        findcook = true;
+        break;
+      }  
     }
 
-    // case 1
-    else if (do_order[0].current_time <= minute[0] && 
-             do_order[0].order_number.size() == 0) {
-      cooker = 0;
-    } 
+    // 大家都很閒
+    for (int i = 0; i < people && !findcook; i++) {
+      if (do_order[i].current_time <= minute[0]) {
+        usable_cook++;
+        if (usable_cook == 1) {
+          first_usable = i;
+        }
+      }
 
-    else if(do_order[1].current_time <= minute[0] && 
+      if (usable_cook == 2) {
+        findcook = true;
+        cooker = first_usable;
+        break;
+      }
+    }
+
+    /*else if(do_order[1].current_time <= minute[0] && 
             do_order[1].order_number.size() == 0) {
       cooker = 1;
-    } 
+    }*/
 
-    else if (do_order[0].current_time <= minute[0]) {
+    for(int i = 0; i < people && !findcook; i++) {
+      if (do_order[i].current_time <= minute[0]) {
+        cooker = i;
+        findcook = true;
+        break;
+      }
+    }
+    
+    /*else if (do_order[0].current_time <= minute[0]) {
       cooker = 0;
     }
 
     else if (do_order[1].current_time <= minute[0]) {
       cooker = 1;
-    }
+    }*/
 
     // 都不閒置
-    else if (do_order[0].current_time > minute[0] &&
-             do_order[1].current_time > minute[0]) {
-      // 都滿了
-      if (do_order[0].order_number.size() == 3 &&
+    if (!findcook) {
+
+      /*if (do_order[0].order_number.size() == 3 &&
           do_order[1].order_number.size() == 3) {
+        abort.SaveFile(order_number[0], minute[0], duration[0], delay[0]);
+        abort.cid.push_back(0);
+        abort.delay_order.push_back(0);
+        abort.leave.push_back(this->minute[0]);
+        PopHead();
+        continue;
+      }*/
+
+      // 都滿了
+      bool all_full = true;
+      for (int i = 0; i < people; i++) {
+        if(do_order[i].order_number.size() != 3) {
+          all_full = false;
+        }
+      }
+
+      if (all_full) {
         abort.SaveFile(order_number[0], minute[0], duration[0], delay[0]);
         abort.cid.push_back(0);
         abort.delay_order.push_back(0);
@@ -399,7 +484,16 @@ void Data::DoubleCooker() {
       }
 
       // 選比較短的，相同取一
-      else if (do_order[0].order_number.size() <= 
+      int shortest = do_order[0].order_number.size();
+      cooker = 0;
+      for (int i = 0; i < people; i++) {
+        if (do_order[i].order_number.size() < shortest) {
+          shortest = do_order[i].order_number.size();
+          cooker = i;
+        }
+      }
+
+      /*if (do_order[0].order_number.size() <= 
                do_order[1].order_number.size()) {
         cooker = 0;
       }
@@ -407,7 +501,7 @@ void Data::DoubleCooker() {
       else if (do_order[0].order_number.size() > 
                do_order[1].order_number.size()) {
         cooker = 1;
-      }
+      }*/
     }
  
     if(this->minute[0] <= do_order[cooker].current_time) {
@@ -429,6 +523,32 @@ void Data::DoubleCooker() {
       }
     }
     // 阿就真的沒有了，直接更新辣(都大)
+    bool arr_gt_curr = false;
+    for (int i = 0; i < people; i++) {
+      if (this->minute[0] > do_order[i].current_time) {
+        arr_gt_curr = true;
+        while(do_order[i].current_time <= minute[0]) {
+          do_order[i].DealWithOrder(abort, timeout, do_order[i].current_time, i + 1);
+          if (do_order[i].order_number.empty()) {
+            break;
+          }
+        }
+      }
+    }
+    
+    if (arr_gt_curr) {
+      if (do_order[cooker].order_number.empty() && do_order[cooker].current_time <= minute[0]) {
+        do_order[cooker].current_time = minute[0] + duration[0];
+      }
+
+      if (!do_order[cooker].order_number.empty()) {
+        do_order[cooker].SaveFile(order_number[0], minute[0], duration[0], delay[0]);
+      }
+
+      PopHead();
+      continue;
+    } 
+    /*
     else if (this->minute[0] > do_order[0].current_time &&
              this->minute[0] > do_order[1].current_time) {
       // 開始處理訂單內容，如果current_time一發生變化就會返回讀資料
@@ -457,9 +577,9 @@ void Data::DoubleCooker() {
 
       PopHead();
       continue;
-    }
+    }*/
 
-    else if (this->minute[0] > do_order[cooker].current_time) {
+    /*else if (this->minute[0] > do_order[cooker].current_time) {
       // 開始處理訂單內容，如果current_time一發生變化就會返回讀資料
       while(do_order[cooker].current_time <= minute[0]) {
         do_order[cooker].DealWithOrder(abort, timeout, do_order[cooker].current_time, cooker + 1);
@@ -479,15 +599,51 @@ void Data::DoubleCooker() {
 
       PopHead();
       continue;
-    }
+    }*/
 
     // 開始處理訂單內容，如果current_time一發生變化就會返回讀資料
-    do_order[0].DealWithOrder(abort, timeout, do_order[0].current_time, 1);
-    do_order[1].DealWithOrder(abort, timeout, do_order[1].current_time, 2);
+    /*do_order[0].DealWithOrder(abort, timeout, do_order[0].current_time, 1);
+    do_order[1].DealWithOrder(abort, timeout, do_order[1].current_time, 2);*/
+    for(int i = 0; i < people; i++) {
+      do_order[i].DealWithOrder(abort, timeout, do_order[i].current_time, i + 1);
+    }
   }
 
+  bool has_left_order = true;
+  while(has_left_order) {
+    int shortest_current_order = -1;
+    for(int i = 0; i < people; i++) {
+      if (!do_order[i].order_number.empty()) {
+        shortest_current_order = i;
+        has_left_order = true;
+        break;
+      }
+
+      else {
+        has_left_order = false;
+      }
+    }
+
+    if (!has_left_order) {
+      break;
+    }
+
+    // 選擇current_time最小的做
+    for(int i = 0; i < people; i++) {
+      if (do_order[i].order_number.size() != 0) {
+        if (do_order[i].current_time < do_order[shortest_current_order].current_time) {
+          shortest_current_order = i;
+        }
+      }
+    }
+
+    do_order[shortest_current_order].DealWithOrder(abort, timeout, do_order[shortest_current_order].current_time, shortest_current_order + 1);
+  }
+
+  OutputCookerList(abort, timeout, total_size, people);
+
   // 依照時間序列處理
-  while (!do_order[0].order_number.empty() || 
+  /*while (!do_order[0].order_number.empty() || 
          !do_order[1].order_number.empty()) {
 
     if (do_order[0].order_number.empty()) {
@@ -516,9 +672,7 @@ void Data::DoubleCooker() {
         do_order[1].order_number.empty()) {
       break;
     }
-  }
-
-  OutputCookerList(abort, timeout, total_size, 3);
+  }*/
 }
 
 // 處理三筆order資料
@@ -557,18 +711,22 @@ void Data::DealWithOrder(Data &abort, Data &timeout, int &current_time, int cook
   }
 }
 
-void Data::OutputCookerList(Data abort, Data timeout, float total, int cmd) {
+void Data::OutputCookerList(Data abort, Data timeout, float total, int people) {
   int delay_count = 0;
   int abort_count = 0;
   int total_delay = 0;
   float fail_data = abort.order_number.size() + timeout.order_number.size();
   std::string title;
-  if (cmd ==2) {
+  if (people == 1) {
     title = "one";
   }
 
-  else if (cmd == 3) {
+  else if (people == 2) {
     title = "two";
+  }
+
+  else {
+    title = "any";
   }
   
   std::ofstream outputFile(title + file_name + ".txt", std::ios::out);
@@ -611,10 +769,14 @@ void Data::OutputCookerList(Data abort, Data timeout, float total, int cmd) {
 
 int main() {
   Data data;
-  std::cout << "testing 402...." << std::endl;
+  std::cout << "testing 401...." << std::endl;
   data.SetFileName("404");
   data.LoadSortedFile("404");
-  data.DoubleCooker();
+  int people;
+  std::cout << "INPUT PEOPLE";
+  std::cin >> people; 
+  data.DoubleCooker(people);
+
   std::cout << "finish!";
   return 0;
 }
