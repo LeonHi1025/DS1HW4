@@ -6,6 +6,7 @@
 #include <string>
 #include <limits>
 #include <chrono>
+#include <vector>
 
 class Data { 
  private:
@@ -21,6 +22,7 @@ class Data {
   int reading_data_time;
   int sorting_data_time;
   int writing_data_time;
+  int idle_time = 0;
 
  public:
   bool LoadFile(std::string file_name);
@@ -38,6 +40,8 @@ class Data {
   void SingleCooker();
   void OutputSingleCookerList(Data abort, Data timeout, float total);
   void DealWithOrder(Data &abort, Data &timeout, int &current_time);
+  void AnyCook();
+  int GetFileLength();
 };
 void Data::SetFileName(std::string name) {
   file_name = name;
@@ -387,12 +391,160 @@ void Data::OutputSingleCookerList(Data abort, Data timeout, float total) {
   outputFile.close();
 }
 
+void Data::AnyCook() {
+  int number_of_cook = 0 , temp_short = 0 , temp_small = 0; // 存最短索引，最小索引
+  bool has_idle = false , need_to_queue = false , is_full = true , end = false;
+  Data abort;    
+  Data timeout;
+  std::cin >> number_of_cook;
+  std::vector<Data> multi_cook(number_of_cook);
+  while (!order_number.empty()) {
+
+    // 看是否有閒置
+    for (int i = 0 ; i < number_of_cook ; i++) {
+      if (multi_cook[i].idle_time <= minute[0] && multi_cook[i].GetFileLength() == 0) {
+        if (order_number.empty()) {
+          end = true;
+          break;
+        }
+        multi_cook[i].idle_time =  minute[0] + duration[0];
+        PopHead();
+        break;
+      }
+    }
+    if (end) {
+      break;
+    }
+
+    need_to_queue = true;
+    for (int i = 0 ; i < number_of_cook ; i++) {
+      if (order_number.empty()) {
+        need_to_queue = false;
+        break;
+      }
+      if (multi_cook[i].idle_time <= minute[0]) {
+        need_to_queue = false;
+        break;
+      }
+    }
+    // 無閒置狀態 ， 排程
+    while (need_to_queue) {
+      // 找最短的佇列且數字最小
+      temp_short = 0;
+      for (int i = 0 ; i < number_of_cook ; i++) {
+        if (multi_cook[i].GetFileLength() < multi_cook[temp_short].GetFileLength()) {
+          temp_short = i;
+        }
+      }
+      // 檢查queue是否已滿
+      is_full = true;
+      for (int i = 0 ; i < number_of_cook ; i++) {
+        if (multi_cook[i].GetFileLength() < 3) {
+          is_full = false;
+          break;
+        }
+      }
+      // 排程，檢查是否滿
+      if (need_to_queue && is_full) {
+        // abort
+        abort.order_number.push_back(order_number[0]);
+        abort.cid.push_back(0);
+        abort.delay_order.push_back(0);
+        abort.leave.push_back(minute[0]);
+        PopHead();
+      } else if (need_to_queue) {
+        multi_cook[temp_short].SaveFile(order_number[0] , minute[0] , duration[0] , delay[0]);
+        PopHead();
+      }
+
+      // 檢查是否需要queue
+      for (int i = 0 ; i < number_of_cook ; i++) {
+        if (order_number.empty()) {
+          need_to_queue = false;
+          break;
+        }
+        if (multi_cook[i].idle_time <= minute[0]) {
+          need_to_queue = false;
+          break;
+        }
+      }
+    }
+
+    // 開始處理queue
+    for (int i = 0 ; i < number_of_cook ; i++) {
+      while (multi_cook[i].idle_time <= minute[0] || order_number.empty()) {
+        if (multi_cook[i].order_number.size() == 0) {
+          break;
+        }
+        if (multi_cook[i].delay[0] < multi_cook[i].idle_time) {
+          // 「逾時時刻」<閒置時刻
+          abort.order_number.push_back(multi_cook[i].order_number[0]);
+          abort.cid.push_back(i + 1);
+          abort.delay_order.push_back(multi_cook[i].idle_time - multi_cook[i].minute[0]);
+          abort.leave.push_back(multi_cook[i].idle_time);
+          multi_cook[i].PopHead();
+
+        } else {
+          if (multi_cook[i].delay[0] < multi_cook[i].idle_time + multi_cook[i].duration[0]) {
+            // 「逾時時刻」<閒置時刻+「製作耗時」
+            timeout.order_number.push_back(multi_cook[i].order_number[0]);
+            timeout.cid.push_back(i + 1);
+            timeout.delay_order.push_back(multi_cook[i].idle_time - multi_cook[i].minute[0]);
+            multi_cook[i].idle_time = multi_cook[i].idle_time + multi_cook[i].duration[0];
+            timeout.leave.push_back(multi_cook[i].idle_time);
+            multi_cook[i].PopHead();
+
+          } else {
+            multi_cook[i].idle_time = multi_cook[i].idle_time + multi_cook[i].duration[0];
+            multi_cook[i].PopHead();
+          }
+        }
+      }
+    }
+  }
+
+  std::cout << oid << "\t";
+  std::cout << arr << "\t";
+  std::cout << dura << "\t";
+  std::cout << time << std::endl;
+
+  for (int i = 0 ; i < abort.order_number.size(); i++) {
+    std::cout << abort.order_number.at(i) << "\t";
+    std::cout << abort.cid.at(i) << "\t";
+    std::cout << abort.delay_order.at(i) << "\t";
+    std::cout << abort.leave.at(i) << std::endl;
+  }
+
+  std::cout << std::endl;
+
+  
+  std::cout << oid << "\t";
+  std::cout << arr << "\t";
+  std::cout << dura << "\t";
+  std::cout << time << std::endl;
+
+  for (int i = 0 ; i < timeout.order_number.size(); i++) {
+    std::cout << timeout.order_number.at(i) << "\t";
+    std::cout << timeout.cid.at(i) << "\t";
+    std::cout << timeout.delay_order.at(i) << "\t";
+    std::cout << timeout.leave.at(i) << std::endl;
+  }
+
+}
+
+int Data::GetFileLength() {
+  return order_number.size();
+}
+
 int main() {
   Data data;
   std::cout << "testing 402...." << std::endl;
-  data.SetFileName("401");
-  data.LoadSortedFile("401");
-  data.SingleCooker();
+  data.SetFileName("402");
+  // data.LoadFile("402");
+  // data.Shell_Sort();
+  // data.OutputSortedFile("402");
+  data.LoadSortedFile("402");
+  data.AnyCook();
   std::cout << "finish!";
   return 0;
 }
