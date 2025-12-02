@@ -22,6 +22,7 @@ class Data {
   int reading_data_time;
   int sorting_data_time;
   int writing_data_time;
+  int current_time;
   int idle_time = 0;
 
  public:
@@ -29,7 +30,6 @@ class Data {
   bool LoadSortedFile(std::string file_name);
   void OutputSortedFile(std::string file_name);
   void SaveFile(int t_ord, int t_min, int t_du, int t_de);
-  void SaveCookList(int current_time);
   void ClearFile(std::vector<int>);
   void PrintFile();
   void Shell_Sort();
@@ -37,9 +37,9 @@ class Data {
   void SetFileName(std::string name);
   void InsertData(std::vector<int> &swap, int smaller, int front, int back);
   void Show_data_time();
-  void SingleCooker();
-  void OutputSingleCookerList(Data abort, Data timeout, float total);
-  void DealWithOrder(Data &abort, Data &timeout, int &current_time);
+  void DoubleCooker(int people);
+  void OutputCookerList(Data abort, Data timeout, float total, int cmd);
+  void DealWithOrder(Data &abort, Data &timeout, int &current_time, int cook);
   void AnyCook();
   int GetFileLength();
 };
@@ -66,13 +66,14 @@ bool Data::LoadSortedFile(std::string file_name) {
     return false;
   }
 
+  file_name = file_name;
   ClearFile(order_number);
   ClearFile(minute);
   ClearFile(duration);
   ClearFile(delay);
 
   in >> oid >> arr >> dura >> time;
-  unsigned long long t_ord, t_min, t_du, t_de;
+  int t_ord, t_min, t_du, t_de;
 
   // https://hackmd.io/@ndhu-programming-2021/BkZukG4jK#隱藏的-flag
   while(!in.eof()) {
@@ -81,6 +82,7 @@ bool Data::LoadSortedFile(std::string file_name) {
       SaveFile(t_ord, t_min, t_du, t_de);
     }
   }
+  this -> file_name = file_name;
   // 關閉讀取
   in.close();
   auto end = std::chrono::high_resolution_clock::now();
@@ -106,7 +108,7 @@ bool Data::LoadFile(std::string file_name) {
   ClearFile(delay);
 
   in >> oid >> arr >> dura >> time;
-  unsigned long long t_ord, t_min, t_du, t_de;
+  int t_ord, t_min, t_du, t_de;
 
   // https://hackmd.io/@ndhu-programming-2021/BkZukG4jK#隱藏的-flag
   while(!in.eof()) {
@@ -115,6 +117,7 @@ bool Data::LoadFile(std::string file_name) {
       SaveFile(t_ord, t_min, t_du, t_de);
     }
   }
+  this -> file_name = file_name;
   // 關閉讀取
   in.close();
   auto end = std::chrono::high_resolution_clock::now();
@@ -161,12 +164,13 @@ void Data::ClearFile(std::vector<int> trash) {
 }
 
 void Data::PrintFile() {
-  std::cout << oid << "\t";
+  std::cout << "\t" << oid << "\t";
   std::cout << arr << "\t";
   std::cout << dura << "\t";
   std::cout << time << std::endl;
 
   for (int i = 0; i < this->order_number.size(); i++) {
+    std::cout << "(" << i + 1 << ") \t";
     std::cout << order_number.at(i) << "\t";
     std::cout << minute.at(i) << "\t";
     std::cout << duration.at(i) << "\t";
@@ -226,47 +230,134 @@ void Data::Show_data_time() {
   std::cout << std::endl;
   std::cout << "Sorting data: " << this->sorting_data_time << " us." << std::endl;
   std::cout << std::endl;
-  std::cout << "Weiting data: " << this->writing_data_time << " us." << std::endl;
+  std::cout << "Writing data: " << this->writing_data_time << " us." << std::endl;
   std::cout << std::endl;
 }
 
-void Data::SingleCooker() {
+void Data::DoubleCooker(int people) {
   float total_size = this->order_number.size();
-  int current_time = minute[0] + duration[0];
   int total_delay = 0;
-  Data do_order; // 不應同時超過三筆
+  std::vector<Data> do_order;
+  Data in; 
+  // 迴圈建立指定數量廚師
+  do_order.resize(people);
   Data abort;    
   Data timeout;
-  PopHead();     // 第一筆已消失
+  int cooker = 0;
+
+  // 迴圈初始化
+  for(int i = 0; i < people; i++) {
+    do_order[i].current_time = minute[0] + duration[0];
+    PopHead();
+  }
+
   while(!order_number.empty()) {
-    /*std::cout << order_number[0] << std::endl;
-    std::cout << current_time << std::endl;*/
+
     if (minute[0] + duration[0] > delay[0] || duration[0] <= 0) {
+      total_size--;
       PopHead();
     }
 
-    /*if (order_number[0] == 102) {
-      std::cout << "cur " << current_time << std::endl;
-      std::cout << "===order===" << std::endl;
-      do_order.PrintFile();
-      std::cout << "===abort===" << std::endl;
-      abort.PrintFile();
-      PrintFile();
-      return;
-    }*/
-
-    if (this->minute[0] == current_time) {
-      do_order.DealWithOrder(abort, timeout, current_time);
-      do_order.SaveFile(order_number[0], minute[0], duration[0], delay[0]);
-      PopHead();
-      // std::cout << current_time << std::endl;
-      continue;;
+    // 閒置和抵達一樣時間處理
+    bool special = false;
+    int special_cook = 0;
+    for(int i = 0; i < people; i++) {
+      if (this->minute[0] == do_order[i].current_time) {
+        special = true;
+        special_cook = i;
+        break;
+      }
     }
 
-    else if(this->minute[0] < current_time) {
+    int t_people = people;
+    if (special) {
+      for(int i = special_cook; i < t_people; i++) {
+        if (this->minute[0] == do_order[i].current_time) {
+          do_order[i].DealWithOrder(abort, timeout, do_order[i].current_time, i + 1);
+        }
+
+        if (special_cook + 1 == people) {
+          special = 0;
+          t_people = special;
+        }
+      }
+    }
+
+    // 兩個都空閒
+
+    bool findcook = false;
+    int usable_cook = 0;
+    int first_usable = 0;
+    
+    // 一個是空閒且空空的
+    for(int i = 0; i < people && !findcook; i++) {
+      if (do_order[i].current_time <= minute[0] && 
+        do_order[i].order_number.size() == 0) {
+        cooker = i;
+        findcook = true;
+        break;
+      }  
+    }
+
+    // 大家都很閒
+    for (int i = 0; i < people && !findcook; i++) {
+      if (do_order[i].current_time <= minute[0]) {
+        usable_cook++;
+        if (usable_cook == 1) {
+          first_usable = i;
+        }
+      }
+
+      if (usable_cook == 2) {
+        findcook = true;
+        cooker = first_usable;
+        break;
+      }
+    }
+
+    for(int i = 0; i < people && !findcook; i++) {
+      if (do_order[i].current_time <= minute[0]) {
+        cooker = i;
+        findcook = true;
+        break;
+      }
+    }
+
+    // 都不閒置
+    if (!findcook) {
+
+      // 都滿了
+      bool all_full = true;
+      for (int i = 0; i < people; i++) {
+        if(do_order[i].order_number.size() != 3) {
+          all_full = false;
+        }
+      }
+
+      if (all_full) {
+        abort.SaveFile(order_number[0], minute[0], duration[0], delay[0]);
+        abort.cid.push_back(0);
+        abort.delay_order.push_back(0);
+        abort.leave.push_back(this->minute[0]);
+        PopHead();
+        continue;
+      }
+
+      // 選比較短的，相同取一
+      int shortest = do_order[0].order_number.size();
+      cooker = 0;
+      for (int i = 0; i < people; i++) {
+        if (do_order[i].order_number.size() < shortest) {
+          shortest = do_order[i].order_number.size();
+          cooker = i;
+        }
+      }
+    }
+ 
+    if(this->minute[0] <= do_order[cooker].current_time) {
       // 如果處理訂單未滿三筆，請讀入
-      if (do_order.order_number.size() < 3) { 
-        do_order.SaveFile(order_number[0], minute[0], duration[0], delay[0]);
+      if (do_order[cooker].order_number.size() < 3) { 
+        do_order[cooker].SaveFile(order_number[0], minute[0], duration[0], delay[0]);
         PopHead();
         continue;
       }
@@ -281,37 +372,74 @@ void Data::SingleCooker() {
         continue;
       }
     }
-    // 阿就真的沒有了，直接更新辣
-    else if (this->minute[0] > current_time) {
-      while (!do_order.order_number.empty()) {
-      // 開始處理訂單內容，如果current_time一發生變化就會返回讀資料
-        do_order.DealWithOrder(abort, timeout, current_time);
+    // 阿就真的沒有了，直接更新辣(都大)
+    bool arr_gt_curr = false;
+    for (int i = 0; i < people; i++) {
+      if (this->minute[0] > do_order[i].current_time) {
+        arr_gt_curr = true;
+        while(do_order[i].current_time <= minute[0]) {
+          do_order[i].DealWithOrder(abort, timeout, do_order[i].current_time, i + 1);
+          if (do_order[i].order_number.empty()) {
+            break;
+          }
+        }
       }
-      if (this->minute[0] > current_time) {
-        current_time = minute[0] + duration[0];
+    }
+    
+    if (arr_gt_curr) {
+      if (!do_order[cooker].order_number.empty() || do_order[cooker].current_time > minute[0]) {
+        do_order[cooker].SaveFile(order_number[0], minute[0], duration[0], delay[0]);
       }
 
-      else {
-        do_order.SaveFile(order_number[0], minute[0], duration[0], delay[0]);
+      if (do_order[cooker].order_number.empty() && do_order[cooker].current_time <= minute[0]) {
+        do_order[cooker].current_time = minute[0] + duration[0];
       }
 
       PopHead();
       continue;
+    } 
+  
+    for(int i = 0; i < people; i++) {
+      do_order[i].DealWithOrder(abort, timeout, do_order[i].current_time, i + 1);
+    }
+  }
+
+  bool has_left_order = true;
+  while(has_left_order) {
+    int shortest_current_order = -1;
+    for(int i = 0; i < people; i++) {
+      if (!do_order[i].order_number.empty()) {
+        shortest_current_order = i;
+        has_left_order = true;
+        break;
+      }
+
+      else {
+        has_left_order = false;
+      }
     }
 
-    // 開始處理訂單內容，如果current_time一發生變化就會返回讀資料
-    do_order.DealWithOrder(abort, timeout, current_time);
+    if (!has_left_order) {
+      break;
+    }
+
+    // 選擇current_time最小的做
+    for(int i = 0; i < people; i++) {
+      if (do_order[i].order_number.size() != 0) {
+        if (do_order[i].current_time < do_order[shortest_current_order].current_time) {
+          shortest_current_order = i;
+        }
+      }
+    }
+
+    do_order[shortest_current_order].DealWithOrder(abort, timeout, do_order[shortest_current_order].current_time, shortest_current_order + 1);
   }
 
-  while (!do_order.order_number.empty()) {
-    // 開始處理訂單內容，如果current_time一發生變化就會返回讀資料
-    do_order.DealWithOrder(abort, timeout, current_time);
-  }
-  OutputSingleCookerList(abort, timeout, total_size);
+  OutputCookerList(abort, timeout, total_size, people);
 }
 
 // 處理三筆order資料
-void Data::DealWithOrder(Data &abort, Data &timeout, int &current_time) {
+void Data::DealWithOrder(Data &abort, Data &timeout, int &current_time, int cooker) {
   while(!order_number.empty()) {
     // 成功處理
     if(delay[0] >= current_time)  {
@@ -322,7 +450,7 @@ void Data::DealWithOrder(Data &abort, Data &timeout, int &current_time) {
                          minute[0],
                          duration[0],
                          delay[0]);
-        timeout.cid.push_back(1);
+        timeout.cid.push_back(cooker);
         timeout.delay_order.push_back(current_time - this->minute[0]);
         timeout.leave.push_back(current_time + duration[0]);
       }
@@ -338,7 +466,7 @@ void Data::DealWithOrder(Data &abort, Data &timeout, int &current_time) {
                      minute[0],
                      duration[0],
                      delay[0]);
-      abort.cid.push_back(1);
+      abort.cid.push_back(cooker);
       abort.delay_order.push_back(current_time - minute[0]);
       abort.leave.push_back(current_time);
       PopHead();
@@ -346,13 +474,25 @@ void Data::DealWithOrder(Data &abort, Data &timeout, int &current_time) {
   }
 }
 
-void Data::OutputSingleCookerList(Data abort, Data timeout, float total) {
+void Data::OutputCookerList(Data abort, Data timeout, float total, int people) {
   int delay_count = 0;
   int abort_count = 0;
   int total_delay = 0;
-  float fail_data = 0;
+  float fail_data = abort.order_number.size() + timeout.order_number.size();
+  std::string title;
+  if (people == 1) {
+    title = "one";
+  }
+
+  else if (people == 2) {
+    title = "two";
+  }
+
+  else {
+    title = "any";
+  }
   
-  std::ofstream outputFile("one" + file_name + ".txt", std::ios::out);
+  std::ofstream outputFile(title + file_name + ".txt", std::ios::out);
   outputFile << "\t[Abort List]" << std::endl;
   outputFile << "\tOID";
   outputFile << "\tCID" ;
@@ -366,7 +506,6 @@ void Data::OutputSingleCookerList(Data abort, Data timeout, float total) {
     outputFile << '\t' <<abort.delay_order[i];        // Delay
     outputFile << '\t' <<abort.leave[i] << std::endl;  // Abort
     total_delay = total_delay + abort.delay_order[i];
-    fail_data++;
   }
 
   outputFile << "\t[Timeout List]" << std::endl;
@@ -381,11 +520,11 @@ void Data::OutputSingleCookerList(Data abort, Data timeout, float total) {
     outputFile << '\t' <<timeout.delay_order[i];
     outputFile << '\t' <<timeout.leave[i] << std::endl;
     total_delay = total_delay + timeout.delay_order[i];
-    fail_data++;
   }
   outputFile << "[Total Delay]" << std::endl;
   outputFile << total_delay << " min." << std::endl;
   outputFile << "[Failure Percentage]" << std::endl;
+  //std::cout << total << " and " << fail_data << std::endl;
   float failure_rate = (fail_data / total) * 100;
   outputFile << std::fixed << std::setprecision(2) << failure_rate << " %";
   outputFile.close();
@@ -394,15 +533,32 @@ void Data::OutputSingleCookerList(Data abort, Data timeout, float total) {
 void Data::AnyCook() {
   int number_of_cook = 0 , temp_short = 0 , temp_small = 0; // 存最短索引，最小索引
   bool has_idle = false , need_to_queue = false , is_full = true , end = false;
+  float total_size = this -> order_number.size();
   Data abort;    
   Data timeout;
-  std::cin >> number_of_cook;
+  while (1) {
+    std::cout << std::endl << "Input the number of queues: ";
+
+    if (!(std::cin >> number_of_cook)) {
+      std::cin.clear(); 
+      std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+      continue;
+    }
+
+    if (number_of_cook <= 19 && number_of_cook >= 1) {
+      break;
+    } else if (number_of_cook >= 0) {
+      std::cout << std::endl << "### It is NOT in [1,19] ###" << std::endl;
+    }
+  }
+  
   std::vector<Data> multi_cook(number_of_cook);
   while (!order_number.empty()) {
 
     // 看是否有閒置
     for (int i = 0 ; i < number_of_cook ; i++) {
       while (minute[0] + duration[0] > delay[0] || duration[0] <= 0) {
+        total_size -= 1;
         PopHead();
       }
       if (multi_cook[i].idle_time <= minute[0] && multi_cook[i].GetFileLength() == 0) {
@@ -422,6 +578,7 @@ void Data::AnyCook() {
     need_to_queue = true;
     for (int i = 0 ; i < number_of_cook ; i++) {
       while (minute[0] + duration[0] > delay[0] || duration[0] <= 0) {
+        total_size -= 1;
         PopHead();
       }
       if (order_number.empty()) {
@@ -466,6 +623,7 @@ void Data::AnyCook() {
       // 檢查是否需要queue
       for (int i = 0 ; i < number_of_cook ; i++) {
         while (minute[0] + duration[0] > delay[0] || duration[0] <= 0) {
+          total_size -= 1;
           PopHead();
         }
         if (order_number.empty()) {
@@ -511,49 +669,90 @@ void Data::AnyCook() {
       }
     }
   }
-
-  std::cout << oid << "\t";
-  std::cout << arr << "\t";
-  std::cout << dura << "\t";
-  std::cout << time << std::endl;
-
-  for (int i = 0 ; i < abort.order_number.size(); i++) {
-    std::cout << abort.order_number.at(i) << "\t";
-    std::cout << abort.cid.at(i) << "\t";
-    std::cout << abort.delay_order.at(i) << "\t";
-    std::cout << abort.leave.at(i) << std::endl;
-  }
-
-  std::cout << std::endl;
-
-  
-  std::cout << oid << "\t";
-  std::cout << arr << "\t";
-  std::cout << dura << "\t";
-  std::cout << time << std::endl;
-
-  for (int i = 0 ; i < timeout.order_number.size(); i++) {
-    std::cout << timeout.order_number.at(i) << "\t";
-    std::cout << timeout.cid.at(i) << "\t";
-    std::cout << timeout.delay_order.at(i) << "\t";
-    std::cout << timeout.leave.at(i) << std::endl;
-  }
-
+  this -> file_name = file_name;
+  OutputCookerList(abort , timeout , total_size , number_of_cook);
 }
 
 int Data::GetFileLength() {
   return order_number.size();
 }
 
+void PrintInitial() {
+  std::cout << "*** (^_^) Data Structure (^o^) ***" << std::endl;
+  std::cout << "** Simulate FIFO Queues by SQF ***" << std::endl;
+  std::cout << "* 0. Quit                        *" << std::endl;
+  std::cout << "* 1. Sort a file                 *" << std::endl;
+  std::cout << "* 2. Simulate one FIFO queue     *" << std::endl;
+  std::cout << "* 3. Simulate two queues by SQF  *" << std::endl;
+  std::cout << "* 4. Simulate some queues by SQF *" << std::endl;
+  std::cout << "**********************************" << std::endl;
+  std::cout << "Input a command(0, 1, 2, 3, 4): ";
+}
+
 int main() {
+  int command = -1;
+  std::string file_name;
+  bool execute_2 = false;
   Data data;
-  std::cout << "testing 403...." << std::endl;
-  // data.SetFileName("403");
-  // data.LoadFile("403");
-  // data.Shell_Sort();
-  // data.OutputSortedFile("403");
-  data.LoadSortedFile("403");
-  data.AnyCook();
-  std::cout << "finish!";
+  Data sorted_data;
+  while (command != 0) {
+    while (1) {
+      PrintInitial();
+      if (!(std::cin >> command)) {
+        command = 0;
+        break;
+      } else if (command < 0) {
+        std::cout << std::endl << "Command does not exist!" << std::endl << std::endl;
+      } else {
+        break;
+      }
+    }
+
+    if (command == 1) {
+      execute_2 = false;
+      std::cout << std::endl << "Input a file number (e.g., 401, 402, 403, ...): ";
+      std::cin >> file_name;
+      if (data.LoadFile(file_name)) {
+        std::cout << std::endl;
+        data.PrintFile();
+        data.Shell_Sort();
+        data.OutputSortedFile(file_name);
+        data.Show_data_time();
+      } else {
+        std::cout << std::endl << "### input" << file_name << ".txt does not exist! ###" << std::endl;
+      }
+    } else if (command == 2) {
+      execute_2 = true;
+      std::cout << std::endl << "Input a file number (e.g., 401, 402, 403, ...): ";
+      std::cin >> file_name;
+      if (sorted_data.LoadSortedFile(file_name)) {
+        std::cout << std::endl;
+        sorted_data.PrintFile();
+        Data copy = sorted_data;
+        sorted_data.DoubleCooker(1);
+        sorted_data = copy;
+      } else {
+        std::cout << std::endl << "### sorted" << file_name << ".txt does not exist! ###" << std::endl << std::endl;
+      }
+    } else if (command == 3) {
+      if (execute_2) {
+        Data copy = sorted_data;
+        sorted_data.DoubleCooker(2);
+        sorted_data = copy;
+        std::cout << std::endl;
+      } else {
+        std::cout << std::endl << "### Execute command 2 first! ###" << std::endl << std::endl;
+      }
+    } else if (command == 4) {
+      if (execute_2) {
+        Data copy = sorted_data;
+        sorted_data.AnyCook();
+        sorted_data = copy;
+        std::cout << std::endl;
+      } else {
+        std::cout << std::endl << "### Execute command 2 first! ###" << std::endl << std::endl;
+      }
+    }
+  }
   return 0;
 }
