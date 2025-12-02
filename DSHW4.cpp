@@ -26,7 +26,7 @@ class Data {
 
  public:
   bool LoadFile(std::string file_name);
-  bool LoadSortedFile(std::string file_name, Data &sorted_data);
+  bool LoadSortedFile(std::string file_name);
   void OutputSortedFile(std::string file_name);
   void SaveFile(int t_ord, int t_min, int t_du, int t_de);
   void ClearFile(std::vector<int>);
@@ -52,7 +52,7 @@ void Data::PopHead() {
 }
 
 // 載入數據
-bool Data::LoadSortedFile(std::string file_name, Data &sorted_data) { 
+bool Data::LoadSortedFile(std::string file_name) { 
   auto start = std::chrono::high_resolution_clock::now();
   std::ifstream in;
   std::string intput_file_name = "sorted" + file_name + ".txt";
@@ -63,10 +63,11 @@ bool Data::LoadSortedFile(std::string file_name, Data &sorted_data) {
     return false;
   }
 
-  ClearFile(sorted_data.order_number);
-  ClearFile(sorted_data.minute);
-  ClearFile(sorted_data.duration);
-  ClearFile(sorted_data.delay);
+  file_name = file_name;
+  ClearFile(order_number);
+  ClearFile(minute);
+  ClearFile(duration);
+  ClearFile(delay);
 
   in >> oid >> arr >> dura >> time;
   int t_ord, t_min, t_du, t_de;
@@ -75,7 +76,7 @@ bool Data::LoadSortedFile(std::string file_name, Data &sorted_data) {
   while(!in.eof()) {
     in >> t_ord >> t_min >> t_du >> t_de;
     if (!in.fail()){
-      sorted_data.SaveFile(t_ord, t_min, t_du, t_de);
+      SaveFile(t_ord, t_min, t_du, t_de);
     }
   }
   // 關閉讀取
@@ -245,20 +246,19 @@ void Data::DoubleCooker(int people) {
   }
 
   while(!order_number.empty()) {
-    //std::cout << order_number[0] << std::endl;
-      /*if (order_number[0] == 135) {
+    if (order_number[0] == 000) {
       std::cout << "cur " << do_order[0].current_time << std::endl;
       std::cout << "===order1===";
       do_order[0].PrintFile();
-      std::cout << "cur " << do_order[1].current_time << std::endl;
+      /*std::cout << "cur " << do_order[1].current_time << std::endl;
       std::cout << "===order2===";
-      do_order[1].PrintFile();
+      do_order[1].PrintFile();*/
       std::cout << "===abort===";
       abort.PrintFile();
       std::cout << "===timeout===";
       timeout.PrintFile();
       return;
-    }*/
+    }
 
     if (minute[0] + duration[0] > delay[0] || duration[0] <= 0) {
       total_size--;
@@ -394,12 +394,12 @@ void Data::DoubleCooker(int people) {
     }
     
     if (arr_gt_curr) {
-      if (do_order[cooker].order_number.empty() && do_order[cooker].current_time <= minute[0]) {
-        do_order[cooker].current_time = minute[0] + duration[0];
+      if (!do_order[cooker].order_number.empty() || do_order[cooker].current_time > minute[0]) {
+        do_order[cooker].SaveFile(order_number[0], minute[0], duration[0], delay[0]);
       }
 
-      if (!do_order[cooker].order_number.empty()) {
-        do_order[cooker].SaveFile(order_number[0], minute[0], duration[0], delay[0]);
+      if (do_order[cooker].order_number.empty() && do_order[cooker].current_time <= minute[0]) {
+        do_order[cooker].current_time = minute[0] + duration[0];
       }
 
       PopHead();
@@ -541,14 +541,12 @@ int main() {
   Data data;
   Data sorted_data;
   std::cout << "testing 401...." << std::endl;
-  data.SetFileName("404");
-  data.LoadSortedFile("404", sorted_data);
-  /*int people;
-  std::cout << "INPUT PEOPLE";
-  std::cin >> people; 
-  data.DoubleCooker(people);*/
-
-  sorted_data.PrintFile();
+  sorted_data.SetFileName("404");
+  sorted_data.LoadSortedFile("404");
+  int people;
+  //std::cout << "INPUT PEOPLE";
+  //std::cin >> people; 
+  sorted_data.DoubleCooker(1);
   std::cout << "finish!";
   return 0;
 }
