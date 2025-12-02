@@ -30,7 +30,7 @@ class Data {
   bool LoadSortedFile(std::string file_name);
   void OutputSortedFile(std::string file_name);
   void SaveFile(int t_ord, int t_min, int t_du, int t_de);
-  void ClearFile(std::vector<int>);
+  void ClearFile(std::vector<int>& trash);
   void PrintFile();
   void Shell_Sort();
   void PopHead();
@@ -102,10 +102,12 @@ bool Data::LoadFile(std::string file_name) {
     return false;
   }
 
+
   ClearFile(order_number);
   ClearFile(minute);
   ClearFile(duration);
   ClearFile(delay);
+
 
   in >> oid >> arr >> dura >> time;
   int t_ord, t_min, t_du, t_de;
@@ -132,15 +134,15 @@ bool Data::LoadFile(std::string file_name) {
 void Data::OutputSortedFile(std::string file_name) {
   auto start = std::chrono::high_resolution_clock::now();
   std::ofstream outputFile("sorted" + file_name + ".txt", std::ios::out);
-  outputFile << "OID ";
-  outputFile << "Arrival " ;
-  outputFile << "Duration ";
-  outputFile << "TimeOut" << std::endl;
+  outputFile << "OID";
+  outputFile << "\tArrival" ;
+  outputFile << "\tDuration";
+  outputFile << "\tTimeOut" << std::endl;
 
   for (int i = 0; i < this->order_number.size(); i++) {
-    outputFile << this->order_number.at(i) << " ";
-    outputFile << this->minute.at(i) << " ";
-    outputFile << this->duration.at(i) << " ";
+    outputFile << this->order_number.at(i) << "\t";
+    outputFile << this->minute.at(i) << "\t";
+    outputFile << this->duration.at(i) << "\t";
     outputFile << this->delay.at(i) << std::endl;
   }
 
@@ -159,15 +161,15 @@ void Data::SaveFile(int t_ord, int t_min, int t_du, int t_de) {
 }
 
 // 檔案清空哦
-void Data::ClearFile(std::vector<int> trash) {
+void Data::ClearFile(std::vector<int>& trash) {
   trash.clear();
 }
 
 void Data::PrintFile() {
-  std::cout << "\t" << oid << "\t";
-  std::cout << arr << "\t";
-  std::cout << dura << "\t";
-  std::cout << time << std::endl;
+  std::cout << "\t" << "OID" << "\t";
+  std::cout << "Arrival" << "\t";
+  std::cout << "Duration" << "\t";
+  std::cout << "TimeOut" << std::endl;
 
   for (int i = 0; i < this->order_number.size(); i++) {
     std::cout << "(" << i + 1 << ") \t";
@@ -496,8 +498,8 @@ void Data::OutputCookerList(Data abort, Data timeout, float total, int people) {
   outputFile << "\t[Abort List]" << std::endl;
   outputFile << "\tOID";
   outputFile << "\tCID" ;
-  outputFile << "\tDelay ";
-  outputFile << "Abort" << std::endl;
+  outputFile << "\tDelay";
+  outputFile << "\tAbort" << std::endl;
   // 輸出abort list
   for (int i = 0; i < abort.order_number.size(); i++) {
     outputFile << "[" << i + 1 << "]";         // OID
@@ -509,9 +511,9 @@ void Data::OutputCookerList(Data abort, Data timeout, float total, int people) {
   }
 
   outputFile << "\t[Timeout List]" << std::endl;
-  outputFile << "\tOID ";
-  outputFile << "\tCID " ;
-  outputFile << "\tDelay ";
+  outputFile << "\tOID";
+  outputFile << "\tCID" ;
+  outputFile << "\tDelay";
   outputFile << "\tDeparture" << std::endl;
   for (int i = 0; i < timeout.order_number.size(); i++) {
     outputFile << "[" << i + 1 << "]\t";
@@ -701,7 +703,7 @@ int main() {
       if (!(std::cin >> command)) {
         command = 0;
         break;
-      } else if (command < 0) {
+      } else if (command < 0 || command >= 5) {
         std::cout << std::endl << "Command does not exist!" << std::endl << std::endl;
       } else {
         break;
@@ -719,7 +721,7 @@ int main() {
         data.OutputSortedFile(file_name);
         data.Show_data_time();
       } else {
-        std::cout << std::endl << "### input" << file_name << ".txt does not exist! ###" << std::endl;
+        std::cout << std::endl << "### input" << file_name << ".txt does not exist! ###" << std::endl << std::endl;
       }
     } else if (command == 2) {
       execute_2 = true;
