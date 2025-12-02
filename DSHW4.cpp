@@ -246,7 +246,22 @@ void Data::DoubleCooker(int people) {
   }
 
   while(!order_number.empty()) {
-  
+    if (order_number[0] == 117) {
+      std::cout << "cur 1 " << do_order[0].current_time << std::endl;
+      std::cout << "===order1===";
+      do_order[0].PrintFile();
+      std::cout << "cur 2 " << do_order[1].current_time << std::endl;
+      std::cout << "===order2===";
+      do_order[1].PrintFile();
+      std::cout << "cur 3 " << do_order[2].current_time << std::endl;
+      std::cout << "===order3===";
+      do_order[2].PrintFile();
+      std::cout << "===abort===";
+      abort.PrintFile();
+      std::cout << "===timeout===";
+      timeout.PrintFile();
+      return;
+    }
 
     if (minute[0] + duration[0] > delay[0] || duration[0] <= 0) {
       total_size--;
@@ -272,7 +287,7 @@ void Data::DoubleCooker(int people) {
         }
 
         if (special_cook + 1 == people) {
-          special = 0;
+          special = -1;
           t_people = special;
         }
       }
