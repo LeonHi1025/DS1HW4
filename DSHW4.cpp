@@ -246,19 +246,7 @@ void Data::DoubleCooker(int people) {
   }
 
   while(!order_number.empty()) {
-    if (order_number[0] == 000) {
-      std::cout << "cur " << do_order[0].current_time << std::endl;
-      std::cout << "===order1===";
-      do_order[0].PrintFile();
-      /*std::cout << "cur " << do_order[1].current_time << std::endl;
-      std::cout << "===order2===";
-      do_order[1].PrintFile();*/
-      std::cout << "===abort===";
-      abort.PrintFile();
-      std::cout << "===timeout===";
-      timeout.PrintFile();
-      return;
-    }
+  
 
     if (minute[0] + duration[0] > delay[0] || duration[0] <= 0) {
       total_size--;
@@ -541,12 +529,12 @@ int main() {
   Data data;
   Data sorted_data;
   std::cout << "testing 401...." << std::endl;
-  sorted_data.SetFileName("404");
-  sorted_data.LoadSortedFile("404");
+  sorted_data.SetFileName("403");
+  sorted_data.LoadSortedFile("403");
   int people;
   //std::cout << "INPUT PEOPLE";
   //std::cin >> people; 
-  sorted_data.DoubleCooker(1);
+  sorted_data.DoubleCooker(3);
   std::cout << "finish!";
   return 0;
 }
